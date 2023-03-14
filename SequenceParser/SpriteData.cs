@@ -18,44 +18,11 @@ namespace SequenceParser
         public string CreationVariableCodeGenerate()
         {
             StringBuilder tempString = new StringBuilder();
-            foreach (var modificatorData in ModificatorsSpriteData)
-            {
-                var dataModificator = modificatorData.GetData();
-                foreach (var dataModificatorKey in dataModificator.Keys)
-                {
-                    if (dataModificator[dataModificatorKey].Item2 <= 1) continue;
-                    var nameVariable = modificatorData.ModificatorName +
-                                       "_" + SpriteName +
-                                       "_" + dataModificatorKey +
-                                       "_" + IndexVariable;
 
-                    tempString.Append(
-                        $"{nameVariable} = new seq_element({dataModificator[dataModificatorKey].Item1});\n");
-                }
-            }
+            foreach (var (naming, modificatorData) in GetNames())
+                tempString.AppendLine($"{naming.variableName} = new seq_element({modificatorData.DataValues});");
 
             return tempString.ToString();
-        }
-
-        public List<string> GetListNames()
-        {
-            List<string> names = new List<string>();
-            foreach (var modificatorData in ModificatorsSpriteData)
-            {
-                var dataModificator = modificatorData.GetData();
-                foreach (var dataModificatorKey in dataModificator.Keys)
-                {
-                    if (dataModificator[dataModificatorKey].Item2 <= 1) continue;
-                    var nameVariable = modificatorData.ModificatorName +
-                                       "_" + SpriteName +
-                                       "_" + dataModificatorKey +
-                                       "_" + IndexVariable;
-
-                    names.Add(nameVariable);
-                }
-            }
-
-            return names;
         }
 
         public string DrawSpriteCodeGenerate()
@@ -63,18 +30,12 @@ namespace SequenceParser
             StringBuilder tempString = new StringBuilder($"draw_sprite_ext({SpriteName}, ");
             Dictionary<string, string> dataDrawSprite = GetStandardValuesDrawSprite();
 
-            foreach (var modificatorData in ModificatorsSpriteData)
+            foreach (var (naming, modificatorData) in GetNames())
             {
-                var dataModificator = modificatorData.GetData();
-                foreach (var dataModificatorKey in dataModificator.Keys)
+                dataDrawSprite[naming.drawDictionaryName] = $"{naming.variableName}.current_value";
+                if (modificatorData.Item2 <= 1)
                 {
-                    var variableNames = GetVariableNames(modificatorData, dataModificatorKey);
-                    dataDrawSprite[variableNames.drawDictionaryName] = $"{variableNames.variableName}.current_value";
-
-                    if (dataModificator[dataModificatorKey].Item2 <= 1)
-                    {
-                        dataDrawSprite[variableNames.drawDictionaryName] = dataModificator[dataModificatorKey].Item3.ToString();
-                    }
+                    dataDrawSprite[naming.drawDictionaryName] = modificatorData.Item3.ToString() ?? "Undefined";
                 }
             }
 
@@ -96,14 +57,26 @@ namespace SequenceParser
             return tempString.ToString();
         }
 
-        private (string variableName, string drawDictionaryName) GetVariableNames(ModificatorData modificatorData, string dataModificatorKey)
+        public IEnumerable<((string variableName, string drawDictionaryName) naming, (string DataValues, int DataListSize, double? firstElementValue) modificatorData)> GetNames()
         {
-            return (modificatorData.ModificatorName +
-                    "_" + SpriteName +
-                    "_" + dataModificatorKey +
-                    "_" + IndexVariable,
-                    modificatorData.ModificatorName + "_" + dataModificatorKey);
+            foreach (var modificatorData in ModificatorsSpriteData)
+            {
+                var dataModificator = modificatorData.GetData();
+                foreach (var dataModificatorKey in dataModificator.Keys)
+                {
+                    if (dataModificator[dataModificatorKey].Item2 <= 1) continue;
+                    var nameVariable = modificatorData.ModificatorName +
+                                       "_" + SpriteName +
+                                       "_" + dataModificatorKey +
+                                       "_" + IndexVariable;
+
+                    yield return ((nameVariable, modificatorData.ModificatorName + "_" + dataModificatorKey), dataModificator[dataModificatorKey]);
+                }
+            }
         }
+        
+        public List<string> GetListNames() =>
+            GetNames().Select(x => x.naming.variableName).ToList();
 
         private Dictionary<string, string> GetStandardValuesDrawSprite()
         {
